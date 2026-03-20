@@ -1,0 +1,263 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <time.h>
+
+#define MAX 100
+
+int A[MAX][MAX], B[MAX][MAX], C[MAX][MAX];
+int rowsA, colsA, rowsB, colsB;
+
+typedef struct {
+    int start;
+    int end;
+} ThreadData;
+
+/* ---------------- Utility ---------------- */
+void printMatrix(int matrix[MAX][MAX], int rows, int cols) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            printf("%5d ", matrix[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+/* ---------------- File Input ---------------- */
+int readFromFile(char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("Error: Cannot open file.\n");
+        return 0;
+    }
+
+    int rA, cA, rB, cB;
+
+    fscanf(file, "%d %d", &rA, &cA);
+
+    if (rA != rowsA || cA != colsA) {
+        printf("Error: Matrix A dimensions mismatch.\n");
+        return 0;
+    }
+
+    for (int i = 0; i < rowsA; i++)
+        for (int j = 0; j < colsA; j++)
+            fscanf(file, "%d", &A[i][j]);
+
+    fscanf(file, "%d %d", &rB, &cB);
+
+    if (rB != rowsB || cB != colsB) {
+        printf("Error: Matrix B dimensions mismatch.\n");
+        return 0;
+    }
+
+    for (int i = 0; i < rowsB; i++)
+        for (int j = 0; j < colsB; j++)
+            fscanf(file, "%d", &B[i][j]);
+
+    fclose(file);
+    return 1;
+}
+
+/* ---------------- Random Fill ---------------- */
+void fillRandom(int min, int max) {
+    for (int i = 0; i < rowsA; i++)
+        for (int j = 0; j < colsA; j++)
+            A[i][j] = rand() % (max - min + 1) + min;
+
+    for (int i = 0; i < rowsB; i++)
+        for (int j = 0; j < colsB; j++)
+            B[i][j] = rand() % (max - min + 1) + min;
+}
+
+/* ---------------- Single Thread ---------------- */
+void singleThreadMultiply() {
+    for (int i = 0; i < rowsA; i++) {
+        for (int j = 0; j < colsB; j++) {
+            C[i][j] = 0;
+            for (int k = 0; k < colsA; k++) {
+                C[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+}
+
+/* ---------------- Row-based ---------------- */
+void* rowThread(void* arg) {
+    ThreadData *data = (ThreadData*)arg;
+
+    for (int i = data->start; i < data->end; i++) {
+        for (int j = 0; j < colsB; j++) {
+            C[i][j] = 0;
+            for (int k = 0; k < colsA; k++) {
+                C[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+    pthread_exit(NULL);
+}
+
+/* ---------------- Column-based ---------------- */
+void* colThread(void* arg) {
+    ThreadData *data = (ThreadData*)arg;
+
+    for (int j = data->start; j < data->end; j++) {
+        for (int i = 0; i < rowsA; i++) {
+            C[i][j] = 0;
+            for (int k = 0; k < colsA; k++) {
+                C[i][j] += A[i][k] * B[k][j];
+            }
+        }
+    }
+    pthread_exit(NULL);
+}
+
+/* ---------------- Element-based ---------------- */
+typedef struct {
+    int row;
+    int col;
+} ElementData;
+
+void* elementThread(void* arg) {
+    ElementData *data = (ElementData*)arg;
+    int sum = 0;
+
+    for (int k = 0; k < colsA; k++) {
+        sum += A[data->row][k] * B[k][data->col];
+    }
+
+    C[data->row][data->col] = sum;
+    pthread_exit(NULL);
+}
+
+/* ---------------- Timing ---------------- */
+double timeDiff(struct timespec start, struct timespec end) {
+    return (end.tv_sec - start.tv_sec) +
+           (end.tv_nsec - start.tv_nsec) / 1e9;
+}
+
+/* ---------------- Main ---------------- */
+int main() {
+    srand(time(NULL));
+
+    printf("Enter rows and columns of Matrix A: ");
+    scanf("%d %d", &rowsA, &colsA);
+
+    printf("Enter rows and columns of Matrix B: ");
+    scanf("%d %d", &rowsB, &colsB);
+
+    if (colsA != rowsB) {
+        printf("Error: Matrices cannot be multiplied.\n");
+        return 0;
+    }
+
+    int choice;
+    printf("\n1. Read from file\n2. Random values\nChoice: ");
+    scanf("%d", &choice);
+
+    if (choice == 1) {
+        char filename[50];
+        printf("Enter filename: ");
+        scanf("%s", filename);
+
+        if (!readFromFile(filename)) return 0;
+
+    } else {
+        int min, max;
+        printf("Enter min and max random values: ");
+        scanf("%d %d", &min, &max);
+        fillRandom(min, max);
+    }
+
+    struct timespec start, end;
+    double t_single, t_row, t_col, t_elem;
+
+    /* ---------- Single Thread ---------- */
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    singleThreadMultiply();
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    t_single = timeDiff(start, end);
+
+    /* ---------- Row-based ---------- */
+    int numThreads;
+    printf("\nEnter number of threads: ");
+    scanf("%d", &numThreads);
+
+    if (numThreads > rowsA) numThreads = rowsA;
+
+    pthread_t threads[numThreads];
+    ThreadData td[numThreads];
+
+    int chunk = rowsA / numThreads;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (int i = 0; i < numThreads; i++) {
+        td[i].start = i * chunk;
+        td[i].end = (i == numThreads - 1) ? rowsA : (i + 1) * chunk;
+        pthread_create(&threads[i], NULL, rowThread, &td[i]);
+    }
+
+    for (int i = 0; i < numThreads; i++)
+        pthread_join(threads[i], NULL);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    t_row = timeDiff(start, end);
+
+    /* ---------- Column-based ---------- */
+    if (numThreads > colsB) numThreads = colsB;
+
+    chunk = colsB / numThreads;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (int i = 0; i < numThreads; i++) {
+        td[i].start = i * chunk;
+        td[i].end = (i == numThreads - 1) ? colsB : (i + 1) * chunk;
+        pthread_create(&threads[i], NULL, colThread, &td[i]);
+    }
+
+    for (int i = 0; i < numThreads; i++)
+        pthread_join(threads[i], NULL);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    t_col = timeDiff(start, end);
+
+    /* ---------- Element-based ---------- */
+    int total = rowsA * colsB;
+    pthread_t elemThreads[total];
+    ElementData ed[total];
+
+    int idx = 0;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (int i = 0; i < rowsA; i++) {
+        for (int j = 0; j < colsB; j++) {
+            ed[idx].row = i;
+            ed[idx].col = j;
+            pthread_create(&elemThreads[idx], NULL, elementThread, &ed[idx]);
+            idx++;
+        }
+    }
+
+    for (int i = 0; i < total; i++)
+        pthread_join(elemThreads[i], NULL);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    t_elem = timeDiff(start, end);
+
+  
+    printf("\nResult Matrix:\n");
+    printMatrix(C, rowsA, colsB);
+
+    printf("\nExecution Times:\n");
+    printf("---------------------------------------\n");
+    printf("Single Thread       : %f sec\n", t_single);
+    printf("Row-based Threads   : %f sec\n", t_row);
+    printf("Column-based Threads: %f sec\n", t_col);
+    printf("Element-based       : %f sec\n", t_elem);
+    printf("---------------------------------------\n");
+
+    return 0;
+}
