@@ -5,7 +5,7 @@
 
 #define MAX 100
 
-int A[MAX][MAX], B[MAX][MAX], C[MAX][MAX];
+int A[MAX][MAX], B[MAX][MAX], C[MAX][MAX] ;
 int rowsA, colsA, rowsB, colsB;
 
 typedef struct {
@@ -152,7 +152,7 @@ int main() {
     }
 
     int choice;
-    printf("\n1. Read from file\n2. Random values\nChoice: ");
+    printf("\n1. Read from file\n2. Random values\nChoice: ") ;
     scanf("%d", &choice);
 
     if (choice == 1) {
