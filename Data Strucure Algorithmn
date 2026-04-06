@@ -1,0 +1,35 @@
+// (i) Method to calculate the sum
+public int sum() {
+    int total = 0;           // Start with a total of 0
+    Node current = head;     // Start at the first node
+    
+    while (current != null) {        // While we haven't reached the end...
+        total = total + current.data; // Add the current number to the total
+        current = current.next;      // Move to the next node
+    }
+    return total;
+}
+
+// (ii) Method to calculate the product
+public int product() {
+    int total = 1;           // Start with 1 (because it's multiplication)
+    Node current = head;     // Start at the first node
+    
+    while (current != null) {           // While we haven't reached the end...
+        total = total * current.data;   // Multiply the total by the current number
+        current = current.next;         // Move to the next node
+    }
+    return total;
+}
+
+// (iii) Method to count the nodes
+public int count() {
+    int numberOfNodes = 0;   // Start our count at 0
+    Node current = head;     // Start at the first node
+    
+    while (current != null) {          // While we haven't reached the end...
+        numberOfNodes++;               // Add 1 to our count
+        current = current.next;        // Move to the next node
+    }
+    return numberOfNodes;
+}
