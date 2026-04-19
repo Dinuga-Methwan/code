@@ -1,6 +1,6 @@
 // (i) Method to calculate the sum
 public int sum() {
-    int total = 0;           // Start with a total of 0
+    int total = 0 ;           // Start with a total of 0
     Node current = head;     // Start at the first node
     
     while (current != null) {        // While we haven't reached the end...
@@ -13,7 +13,7 @@ public int sum() {
 // (ii) Method to calculate the product
 public int product() {
     int total = 1;           // Start with 1 (because it's multiplication)
-    Node current = head;     // Start at the first node
+    Node current = head ;     // Start at the first node
     
     while (current != null) {           // While we haven't reached the end...
         total = total * current.data;   // Multiply the total by the current number
