@@ -11,9 +11,9 @@ public int sum() {
 }
 
 // (ii) Method to calculate the product
-public int product() {
+public int product()  {
     int total = 1;           // Start with 1 (because it's multiplication)
-    Node current = head ;     // Start at the first node
+    Node current =  head ;     // Start at the first node
     
     while (current != null) {           // While we haven't reached the end...
         total = total * current.data;   // Multiply the total by the current number
